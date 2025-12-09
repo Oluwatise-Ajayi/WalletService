@@ -11,6 +11,7 @@ import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import * as Joi from 'joi';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import * as Joi from 'joi';
     AuthModule,
     WalletModule,
     KeysModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
