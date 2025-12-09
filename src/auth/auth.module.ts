@@ -7,7 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { PrismaService } from '../prisma.service'; // Will create this later
+import { PrismaService } from '../prisma.service'; 
 
 @Module({
     imports: [

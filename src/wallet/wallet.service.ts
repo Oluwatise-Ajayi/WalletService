@@ -22,6 +22,9 @@ export class WalletService {
         if (!wallet) throw new NotFoundException('Wallet not found');
 
         const paystackSecret = this.configService.get<string>('paystack.secretKey');
+        if (!paystackSecret) {
+            throw new Error('Paystack secret key is not configured');
+        }
 
         // Initialize Paystack Transaction
         const response = await axios.post(
@@ -58,6 +61,9 @@ export class WalletService {
 
     async handleWebhook(signature: string, payload: any) {
         const secret = this.configService.get<string>('paystack.secretKey'); // Or WEBHOOK_SECRET
+        if (!secret) {
+            throw new Error('Paystack secret key is not configured');
+        }
         const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(payload)).digest('hex');
 
         if (hash !== signature) {

@@ -37,4 +37,4 @@ import * as Joi from 'joi';
     },
   ],
 })
-export class AppModule { } }
+export class AppModule { }
