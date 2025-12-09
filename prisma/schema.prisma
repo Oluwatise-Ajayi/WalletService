@@ -1,0 +1,88 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  googleId  String   @unique
+  firstName String?
+  lastName  String?
+  picture   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallet    Wallet?
+  apiKeys   ApiKey[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Decimal  @default(0.00) @db.Decimal(20, 2)
+  currency  String   @default("NGN")
+  version   Int      @default(0) // Optimistic locking
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@map("wallets")
+}
+
+model ApiKey {
+  id          String   @id @default(uuid())
+  userId      String
+  key         String   @unique // Hashed key
+  name        String
+  permissions String[] // stored as JSON string array if needed, or scalar list
+  expiresAt   DateTime
+  isRevoked   Boolean  @default(false)
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+model Transaction {
+  id          String            @id @default(uuid())
+  walletId    String
+  amount      Decimal           @db.Decimal(20, 2)
+  type        TransactionType
+  status      TransactionStatus @default(PENDING)
+  reference   String            @unique
+  metadata    Json?
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@index([reference])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  DEPOSIT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
