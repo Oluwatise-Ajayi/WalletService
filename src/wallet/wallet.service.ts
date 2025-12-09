@@ -50,22 +50,28 @@ export class WalletService {
         }
 
         // Initialize Paystack Transaction
-        const response = await axios.post(
-            'https://api.paystack.co/transaction/initialize',
-            {
-                email: user.email,
-                amount: amount * 100, // Paystack is in kobo
-                metadata: {
-                    walletId: wallet.id,
-                    type: 'DEPOSIT',
+        let response;
+        try {
+            response = await axios.post(
+                'https://api.paystack.co/transaction/initialize',
+                {
+                    email: user.email,
+                    amount: amount * 100, // Paystack is in kobo
+                    metadata: {
+                        walletId: wallet.id,
+                        type: 'DEPOSIT',
+                    },
                 },
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${paystackSecret}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${paystackSecret}`,
+                    },
                 },
-            },
-        );
+            );
+        } catch (error) {
+            this.logger.error('Paystack Error', error.response?.data || error.message);
+            throw new BadRequestException('Payment initialization failed: ' + (error.response?.data?.message || error.message));
+        }
 
         // Create a pending transaction record
         await this.prisma.transaction.create({
