@@ -15,11 +15,34 @@ export class WalletService {
         private configService: ConfigService,
     ) { }
 
+    async lookupRecipient(email: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+            include: { wallet: true },
+        });
+
+        if (!user || !user.wallet) {
+            throw new NotFoundException('Recipient not found');
+        }
+
+        return {
+            valid: true,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            walletId: user.wallet.id,
+        };
+    }
+
     async deposit(userId: string, amount: number) {
+        if (!userId) throw new BadRequestException('User ID is required');
         if (amount <= 0) throw new BadRequestException('Amount must be positive');
 
         const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
         if (!wallet) throw new NotFoundException('Wallet not found');
+
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
 
         const paystackSecret = this.configService.get<string>('paystack.secretKey');
         if (!paystackSecret) {
@@ -30,7 +53,7 @@ export class WalletService {
         const response = await axios.post(
             'https://api.paystack.co/transaction/initialize',
             {
-                email: 'user@example.com', // In real app, fetch user email
+                email: user.email,
                 amount: amount * 100, // Paystack is in kobo
                 metadata: {
                     walletId: wallet.id,
@@ -57,6 +80,20 @@ export class WalletService {
         });
 
         return response.data.data;
+    }
+
+    async getDepositStatus(reference: string) {
+        const transaction = await this.prisma.transaction.findUnique({
+            where: { reference },
+        });
+
+        if (!transaction) throw new NotFoundException('Transaction not found');
+
+        return {
+            reference: transaction.reference,
+            status: transaction.status,
+            amount: transaction.amount,
+        };
     }
 
     async handleWebhook(signature: string, payload: any) {
@@ -119,17 +156,19 @@ export class WalletService {
             const senderWallet = await prisma.wallet.findUnique({ where: { userId: senderUserId } });
             if (!senderWallet) throw new NotFoundException('Sender wallet not found');
 
-            // Atomic Deduct
-            const senderUpdate = await prisma.wallet.update({
-                where: { id: senderWallet.id }, // We can add optimistic concurrency check (version) here if needed
+            // Atomic Deduct with Condition (simulate Check Constraint)
+            // functionality: decrement balance ONLY IF balance >= amount
+            const updateResult = await prisma.wallet.updateMany({
+                where: {
+                    id: senderWallet.id,
+                    balance: { gte: amount },
+                },
                 data: {
                     balance: { decrement: amount },
                 },
             });
-            // Check if balance went negative (Prisma doesn't check constraint by default unless DB has CHECK constraint)
-            // If we use standard Postgres CHECK constraint `balance >= 0`, it throws error.
-            // As a safeguard in app logic (since we didn't add CHECK in schema explicitly yet):
-            if (senderUpdate.balance.lessThan(0)) {
+
+            if (updateResult.count === 0) {
                 throw new BadRequestException('Insufficient balance');
             }
 

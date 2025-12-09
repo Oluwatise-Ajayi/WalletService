@@ -1,7 +1,8 @@
 
-import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException, Query, Param } from '@nestjs/common';
 import { WalletService } from './wallet.service';
-import { AuthGuard } from '@nestjs/passport';
+import { UnifiedAuthGuard } from '../auth/guards/unified-auth.guard';
+import { Permissions } from '../common/guards/permissions.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Wallet')
@@ -11,10 +12,12 @@ export class WalletController {
     constructor(private readonly walletService: WalletService) { }
 
     @Post('deposit')
-    @UseGuards(AuthGuard('jwt')) // Or API Key
+    @UseGuards(UnifiedAuthGuard)
+    @Permissions('deposit')
     @ApiOperation({ summary: 'Deposit funds into wallet' })
     @ApiBody({ schema: { type: 'object', properties: { amount: { type: 'number' } } } })
     async deposit(@Req() req, @Body() body: { amount: number }) {
+        console.log('Deposit req.user:', req.user);
         return this.walletService.deposit(req.user.userId, body.amount);
     }
 
@@ -25,23 +28,51 @@ export class WalletController {
         return this.walletService.handleWebhook(signature, payload);
     }
 
+    @Get('deposit/:reference/status')
+    @ApiOperation({ summary: 'Verify Deposit Status' })
+    async verifyDepositStatus(@Param('reference') reference: string) {
+        return this.walletService.getDepositStatus(reference);
+    }
+
+    @Get('recipient')
+    @UseGuards(UnifiedAuthGuard)
+    @Permissions('read', 'transfer')
+    @ApiOperation({ summary: 'Lookup recipient by email' })
+    async lookupRecipient(@Query('email') email: string) {
+        return this.walletService.lookupRecipient(email);
+    }
+
     @Post('transfer')
-    @UseGuards(AuthGuard('jwt'))
+    @UseGuards(UnifiedAuthGuard)
+    @Permissions('transfer')
     @ApiOperation({ summary: 'Transfer funds to another wallet' })
-    @ApiBody({ schema: { type: 'object', properties: { wallet_number: { type: 'string' }, amount: { type: 'number' } } } })
-    async transfer(@Req() req, @Body() body: { wallet_number: string; amount: number }) {
-        return this.walletService.transfer(req.user.userId, body.wallet_number, body.amount);
+    @ApiBody({ schema: { type: 'object', properties: { wallet_number: { type: 'string' }, email: { type: 'string' }, amount: { type: 'number' } } } })
+    async transfer(@Req() req, @Body() body: { wallet_number?: string; email?: string; amount: number }) {
+        let recipientWalletId = body.wallet_number;
+
+        if (body.email) {
+            const recipient = await this.walletService.lookupRecipient(body.email);
+            recipientWalletId = recipient.walletId;
+        }
+
+        if (!recipientWalletId) {
+            throw new BadRequestException('Recipient wallet number or email required');
+        }
+
+        return this.walletService.transfer(req.user.userId, recipientWalletId, body.amount);
     }
 
     @Get('balance')
-    @UseGuards(AuthGuard('jwt'))
+    @UseGuards(UnifiedAuthGuard)
+    @Permissions('read')
     @ApiOperation({ summary: 'Get wallet balance' })
     async getBalance(@Req() req) {
         return this.walletService.getBalance(req.user.userId);
     }
 
     @Get('transactions')
-    @UseGuards(AuthGuard('jwt'))
+    @UseGuards(UnifiedAuthGuard)
+    @Permissions('read')
     @ApiOperation({ summary: 'Get transaction history' })
     async getTransactions(@Req() req) {
         return this.walletService.getTransactions(req.user.userId);

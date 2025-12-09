@@ -90,4 +90,32 @@ export class KeysService {
             default: throw new BadRequestException('Invalid duration unit (H, D, M, Y)');
         }
     }
+
+    async validateKey(rawKey: string) {
+        const hashedKey = crypto.createHash('sha256').update(rawKey).digest('hex');
+
+        const keyRecord = await this.prisma.apiKey.findUnique({
+            where: { key: hashedKey },
+            include: { user: true },
+        });
+
+        if (!keyRecord) return null;
+
+        if (keyRecord.isRevoked) {
+            throw new BadRequestException('API Key has been revoked');
+        }
+
+        if (keyRecord.expiresAt < new Date()) {
+            throw new BadRequestException('API Key has expired');
+        }
+
+        // Update last used (optional, but good practice)
+        // await this.prisma.apiKey.update({ where: { id: keyRecord.id }, data: { lastUsedAt: new Date() } });
+
+        return {
+            userId: keyRecord.userId,
+            email: keyRecord.user.email,
+            permissions: keyRecord.permissions,
+        };
+    }
 }

@@ -1,4 +1,3 @@
-
 import { Controller, Get, UseGuards, Req, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -20,10 +19,13 @@ export class AuthController {
     @UseGuards(AuthGuard('google'))
     @ApiOperation({ summary: 'Google login callback' })
     async googleAuthRedirect(@Req() req, @Res() res) {
-        const { access_token } = await this.authService.login(req.user);
-        // Ideally redirect to frontend with token, or just return JSON for this API-only task
-        // Using JSON response for simplicity as frontend is out of scope, but usually we redirect.
-        // To see the token, let's return it.
+        // 1. VALIDATE: Save/Find the user in your database first!
+        // req.user currently holds the Google profile details
+        const dbUser = await this.authService.validateGoogleUser(req.user);
+
+        // 2. LOGIN: Now pass the *database user* (which has an .id) to login
+        const { access_token } = await this.authService.login(dbUser);
+        
         res.json({ access_token });
     }
 }
