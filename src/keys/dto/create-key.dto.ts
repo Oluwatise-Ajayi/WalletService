@@ -1,7 +1,6 @@
 import { IsString, IsNotEmpty, IsEnum, IsArray, ArrayMinSize, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-// Define allowed permissions strictly
 export enum ApiPermission {
     DEPOSIT = 'deposit',
     TRANSFER = 'transfer',
@@ -18,7 +17,10 @@ export class CreateApiKeyDto {
         example: ['deposit', 'read'],
         enum: ApiPermission,
         isArray: true,
-        description: 'List of permissions this key is allowed to perform'
+        description: 'List of permissions this key is allowed to perform. \n\n' +
+            '- `deposit`: Add funds to a wallet.\n' +
+            '- `transfer`: Send funds to another user.\n' +
+            '- `read`: View wallet balance and transaction history.'
     })
     @IsArray()
     @ArrayMinSize(1)

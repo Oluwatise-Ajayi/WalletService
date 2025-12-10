@@ -141,4 +141,42 @@ export class KeysService {
 
         return null;
     }
+    async getKeys(userId: string) {
+        const keys = await this.prisma.apiKey.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                name: true,
+                prefix: true,
+                maskedKey: true,
+                permissions: true,
+                isRevoked: true,
+                expiresAt: true,
+                createdAt: true,
+            }
+        });
+
+        return keys;
+    }
+
+    async getKey(userId: string, keyId: string) {
+        const key = await this.prisma.apiKey.findFirst({
+            where: { id: keyId, userId },
+            select: {
+                id: true,
+                name: true,
+                prefix: true,
+                maskedKey: true,
+                permissions: true,
+                isRevoked: true,
+                expiresAt: true,
+                createdAt: true,
+            }
+        });
+
+        if (!key) throw new NotFoundException('API Key not found');
+
+        return key;
+    }
 }

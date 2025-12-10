@@ -1,5 +1,5 @@
 
-import { Controller, Post, Body, Req, UseGuards, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, UseGuards, Param } from '@nestjs/common';
 import { KeysService } from './keys.service';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiSecurity } from '@nestjs/swagger';
@@ -13,6 +13,23 @@ import { UnifiedAuthGuard } from 'src/auth/guards/unified-auth.guard';
 @Controller('keys')
 export class KeysController {
     constructor(private readonly keysService: KeysService) { }
+
+    @Get()
+    @UseGuards(UnifiedAuthGuard)
+    @ApiOperation({ summary: 'Get all API Keys' })
+    @ApiResponse({ status: 200, description: 'Return all API keys.' })
+    async findAll(@Req() req) {
+        return this.keysService.getKeys(req.user.userId);
+    }
+
+    @Get(':id')
+    @UseGuards(UnifiedAuthGuard)
+    @ApiOperation({ summary: 'Get a single API Key' })
+    @ApiResponse({ status: 200, description: 'Return API key details.' })
+    @ApiResponse({ status: 404, description: 'API Key not found.' })
+    async findOne(@Req() req, @Param('id') id: string) {
+        return this.keysService.getKey(req.user.userId, id);
+    }
 
     @Post('create')
     @UseGuards(UnifiedAuthGuard)

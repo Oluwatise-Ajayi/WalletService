@@ -162,6 +162,10 @@ export class WalletService {
             const senderWallet = await prisma.wallet.findUnique({ where: { userId: senderUserId } });
             if (!senderWallet) throw new NotFoundException('Sender wallet not found');
 
+            if (senderWallet.id === recipientWalletId) {
+                throw new BadRequestException('Cannot transfer to yourself');
+            }
+
             // Atomic Deduct with Condition (simulate Check Constraint)
             // functionality: decrement balance ONLY IF balance >= amount
             const updateResult = await prisma.wallet.updateMany({

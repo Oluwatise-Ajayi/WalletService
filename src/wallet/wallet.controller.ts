@@ -2,7 +2,7 @@
 import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException, Query, Param, ForbiddenException } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { UnifiedAuthGuard } from '../auth/guards/unified-auth.guard';
-import { Permissions } from '../common/guards/permissions.guard';
+import { Permissions, PermissionsGuard } from '../common/guards/permissions.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiSecurity } from '@nestjs/swagger';
 import { CompositeAuthGuard } from '../common/guards/composite-auth.guard';
 
@@ -39,7 +39,7 @@ export class WalletController {
     }
 
     @Get('recipient')
-    @UseGuards(UnifiedAuthGuard)
+    @UseGuards(UnifiedAuthGuard, PermissionsGuard)
     @Permissions('read', 'transfer')
     @ApiBearerAuth('JWT-auth')
     @ApiSecurity('API-Key-auth')
@@ -49,7 +49,7 @@ export class WalletController {
     }
 
     @Post('transfer')
-    @UseGuards(UnifiedAuthGuard)
+    @UseGuards(UnifiedAuthGuard, PermissionsGuard)
     @Permissions('transfer')
     @ApiBearerAuth('JWT-auth')
     @ApiSecurity('API-Key-auth')
@@ -71,7 +71,7 @@ export class WalletController {
     }
 
     @Get('balance')
-    @UseGuards(UnifiedAuthGuard)
+    @UseGuards(UnifiedAuthGuard, PermissionsGuard)
     @Permissions('read')
     @ApiBearerAuth('JWT-auth')
     @ApiSecurity('API-Key-auth')
@@ -81,7 +81,7 @@ export class WalletController {
     }
 
     @Get('transactions')
-    @UseGuards(UnifiedAuthGuard)
+    @UseGuards(UnifiedAuthGuard, PermissionsGuard)
     @Permissions('read')
     @ApiBearerAuth('JWT-auth')
     @ApiSecurity('API-Key-auth')
