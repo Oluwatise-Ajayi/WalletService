@@ -1,13 +1,13 @@
 import { PrismaClient } from '@prisma/client';
-import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt'; // <--- Using bcrypt to match your Service logic
 
 const prisma = new PrismaClient();
 
 async function main() {
     const email = 'test_user@example.com';
     const api_key_raw = 'sk_live_test_key_12345';
-    const api_key_hash = crypto.createHash('sha256').update(api_key_raw).digest('hex');
 
+    // 1. Create User
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
         user = await prisma.user.create({
@@ -26,19 +26,31 @@ async function main() {
         console.log('User exists:', user.id);
     }
 
-    // Create API Key if not exists
-    // First delete old ones for cleanliness
+    // 2. Prepare API Key Data (Securely)
+    // We use bcrypt because that is what your KeysService uses to validate
+    const api_key_hash = await bcrypt.hash(api_key_raw, 10);
+    const prefix = api_key_raw.substring(0, 12);
+    const maskedKey = `${prefix}...${api_key_raw.slice(-4)}`;
+
+    // 3. Clean up old keys
     await prisma.apiKey.deleteMany({ where: { userId: user.id } });
 
-    const key = await prisma.apiKey.create({
+    // 4. Create New Key with NEW Schema fields
+    await prisma.apiKey.create({
         data: {
             userId: user.id,
             name: 'Test Key',
-            key: api_key_hash,
             permissions: ['deposit', 'transfer', 'read'],
             expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day
+
+            // --- NEW FIELDS ---
+            keyHash: api_key_hash, // Was 'key'
+            prefix: prefix,
+            maskedKey: maskedKey,
+            // ------------------
         }
     });
+
     console.log('Created API Key:', api_key_raw);
 }
 

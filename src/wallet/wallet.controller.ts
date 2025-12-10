@@ -1,22 +1,26 @@
 
-import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException, Query, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException, Query, Param, ForbiddenException } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { UnifiedAuthGuard } from '../auth/guards/unified-auth.guard';
 import { Permissions } from '../common/guards/permissions.guard';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiSecurity } from '@nestjs/swagger';
+import { CompositeAuthGuard } from '../common/guards/composite-auth.guard';
 
 @ApiTags('Wallet')
-@ApiBearerAuth()
 @Controller('wallet')
 export class WalletController {
     constructor(private readonly walletService: WalletService) { }
 
     @Post('deposit')
-    @UseGuards(UnifiedAuthGuard)
-    @Permissions('deposit')
+    @UseGuards(CompositeAuthGuard)
+    @ApiSecurity('JWT-auth')
+    @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Deposit funds into wallet' })
     @ApiBody({ schema: { type: 'object', properties: { amount: { type: 'number' } } } })
     async deposit(@Req() req, @Body() body: { amount: number }) {
+        if (req.user.isService && !req.user.permissions.includes('deposit')) {
+            throw new ForbiddenException('Key missing deposit permission');
+        }
         console.log('Deposit req.user:', req.user);
         return this.walletService.deposit(req.user.userId, body.amount);
     }
@@ -37,6 +41,8 @@ export class WalletController {
     @Get('recipient')
     @UseGuards(UnifiedAuthGuard)
     @Permissions('read', 'transfer')
+    @ApiBearerAuth('JWT-auth')
+    @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Lookup recipient by email' })
     async lookupRecipient(@Query('email') email: string) {
         return this.walletService.lookupRecipient(email);
@@ -45,6 +51,8 @@ export class WalletController {
     @Post('transfer')
     @UseGuards(UnifiedAuthGuard)
     @Permissions('transfer')
+    @ApiBearerAuth('JWT-auth')
+    @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Transfer funds to another wallet' })
     @ApiBody({ schema: { type: 'object', properties: { wallet_number: { type: 'string' }, email: { type: 'string' }, amount: { type: 'number' } } } })
     async transfer(@Req() req, @Body() body: { wallet_number?: string; email?: string; amount: number }) {
@@ -65,6 +73,8 @@ export class WalletController {
     @Get('balance')
     @UseGuards(UnifiedAuthGuard)
     @Permissions('read')
+    @ApiBearerAuth('JWT-auth')
+    @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Get wallet balance' })
     async getBalance(@Req() req) {
         return this.walletService.getBalance(req.user.userId);
@@ -73,6 +83,8 @@ export class WalletController {
     @Get('transactions')
     @UseGuards(UnifiedAuthGuard)
     @Permissions('read')
+    @ApiBearerAuth('JWT-auth')
+    @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Get transaction history' })
     async getTransactions(@Req() req) {
         return this.walletService.getTransactions(req.user.userId);

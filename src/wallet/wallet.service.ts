@@ -178,15 +178,30 @@ export class WalletService {
                 throw new BadRequestException('Insufficient balance');
             }
 
+            // Fetch Sender and Recipient Details for Metadata
+            // Since we are inside a transaction, we should fetch these before or reuse if possible.
+            // We already fetched senderWallet. We need Recipient Wallet to get Recipient User.
+
+            const recipientWallet = await prisma.wallet.findUnique({
+                where: { id: recipientWalletId },
+                include: { user: true }
+            });
+
+            if (!recipientWallet) throw new NotFoundException('Recipient wallet not found');
+
+            // We also need sender user details
+            const senderUser = await prisma.user.findUnique({ where: { id: senderUserId } });
+            if (!senderUser) throw new NotFoundException('Sender user not found');
+
             // Add to Recipient
             await prisma.wallet.update({
-                where: { id: recipientWalletId }, // Validate recipient exists
+                where: { id: recipientWalletId },
                 data: {
                     balance: { increment: amount },
                 },
             });
 
-            // Record Transactions
+            // Record Transactions with Metadata
             await prisma.transaction.create({
                 data: {
                     walletId: senderWallet.id,
@@ -195,6 +210,14 @@ export class WalletService {
                     status: TransactionStatus.SUCCESS,
                     reference: `TRF-${crypto.randomUUID()}`,
                     description: `Transfer to ${recipientWalletId}`,
+                    metadata: {
+                        relatedWalletId: recipientWalletId,
+                        relatedUser: {
+                            firstName: recipientWallet.user.firstName,
+                            lastName: recipientWallet.user.lastName,
+                            email: recipientWallet.user.email
+                        }
+                    }
                 },
             });
 
@@ -206,6 +229,14 @@ export class WalletService {
                     status: TransactionStatus.SUCCESS,
                     reference: `TRF-IN-${crypto.randomUUID()}`,
                     description: `Transfer from ${senderWallet.id}`,
+                    metadata: {
+                        relatedWalletId: senderWallet.id,
+                        relatedUser: {
+                            firstName: senderUser.firstName,
+                            lastName: senderUser.lastName,
+                            email: senderUser.email
+                        }
+                    }
                 },
             });
 
@@ -221,10 +252,54 @@ export class WalletService {
         const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
         if (!wallet) throw new NotFoundException('Wallet not found');
 
-        return this.prisma.transaction.findMany({
+        const transactions = await this.prisma.transaction.findMany({
             where: { walletId: wallet.id },
             orderBy: { createdAt: 'desc' },
             take: 20, // Simple pagination limit
         });
+
+        // Enrich transactions with missing user details
+        const enrichedTransactions = await Promise.all(transactions.map(async (tx) => {
+            const metadata = tx.metadata as any || {};
+
+            // If we already have user details in metadata, return as is (maybe flatten structure if needed, but keeping it flexible)
+            let relatedUser = metadata.relatedUser;
+
+            if (!relatedUser && (tx.type === TransactionType.TRANSFER_IN || tx.type === TransactionType.TRANSFER_OUT)) {
+                // Try to resolve from relatedWalletId or description
+                let relatedWalletId = metadata.relatedWalletId;
+
+                // Fallback: Parse description if relatedWalletId is missing
+                if (!relatedWalletId && tx.description) {
+                    const match = tx.description.match(/Transfer (?:to|from) ([a-f0-9-]+)/);
+                    if (match) {
+                        relatedWalletId = match[1];
+                    }
+                }
+
+                if (relatedWalletId) {
+                    // Fetch the related wallet and user
+                    const relatedWallet = await this.prisma.wallet.findUnique({
+                        where: { id: relatedWalletId },
+                        include: { user: true },
+                    });
+
+                    if (relatedWallet && relatedWallet.user) {
+                        relatedUser = {
+                            firstName: relatedWallet.user.firstName,
+                            lastName: relatedWallet.user.lastName,
+                            email: relatedWallet.user.email,
+                        };
+                    }
+                }
+            }
+
+            return {
+                ...tx,
+                relatedUser, // Add the resolved or existing user details
+            };
+        }));
+
+        return enrichedTransactions;
     }
 }

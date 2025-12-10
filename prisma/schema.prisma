@@ -43,17 +43,31 @@ model Wallet {
 model ApiKey {
   id          String   @id @default(uuid())
   userId      String
-  key         String   @unique // Hashed key
+  
+  // 1. Security: Store the HASH, not the key
+  keyHash     String   @unique 
+  
+  // Lookup Optimization (First 8 chars of sk_live_...)
+  prefix      String   @default("") 
+  
+  // 2. Display: Show first/last chars so user knows which key it is
+  maskedKey   String   // e.g., "sk_live_...43a2"
+  
   name        String
-  permissions String[] // stored as JSON string array if needed, or scalar list
+  
+  // 3. Permissions: JSON array or specific Enum array
+  permissions String[] // ["deposit", "transfer", "read"]
+  
+  // 4. Lifecycle Management
   expiresAt   DateTime
-  isRevoked   Boolean  @default(false)
   lastUsedAt  DateTime?
+  isRevoked   Boolean  @default(false)
+  
   createdAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId])
+  
+  user        User     @relation(fields: [userId], references: [id])
+  
+  @@index([prefix])
   @@map("api_keys")
 }
 
