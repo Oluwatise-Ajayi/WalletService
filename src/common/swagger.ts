@@ -3,13 +3,22 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 export function setupSwagger(app: INestApplication) {
     const config = new DocumentBuilder()
-        .setTitle('Wallet Service API')
-        .setDescription('API documentation for the Wallet Service')
+        .setTitle('Wallet Service')
+        .setDescription('The Wallet Service API description')
         .setVersion('1.0')
-        .addBearerAuth()
-        .addTag('Auth')
-        .addTag('Wallet')
-        .addTag('Health')
+        .addBearerAuth(
+            { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+            'JWT-auth',
+        )
+        .addApiKey(
+            {
+                type: 'apiKey',
+                name: 'x-api-key',
+                in: 'header',
+                description: 'Enter your API Key here (sk_live_...)'
+            },
+            'API-Key-auth',
+        )
         .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('docs', app, document, {
