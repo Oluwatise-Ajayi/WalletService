@@ -1,10 +1,10 @@
-
-import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException, Query, Param, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Req, UseGuards, Headers, BadRequestException, Query, Param, ForbiddenException, UsePipes, ValidationPipe } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { UnifiedAuthGuard } from '../auth/guards/unified-auth.guard';
 import { Permissions, PermissionsGuard } from '../common/guards/permissions.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiSecurity } from '@nestjs/swagger';
 import { CompositeAuthGuard } from '../common/guards/composite-auth.guard';
+import { DepositDto, TransferDto } from './wallet.dto';
 
 @ApiTags('Wallet')
 @Controller('wallet')
@@ -16,8 +16,8 @@ export class WalletController {
     @ApiSecurity('JWT-auth')
     @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Deposit funds into wallet' })
-    @ApiBody({ schema: { type: 'object', properties: { amount: { type: 'number' } } } })
-    async deposit(@Req() req, @Body() body: { amount: number }) {
+    @UsePipes(new ValidationPipe({ transform: true }))
+    async deposit(@Req() req, @Body() body: DepositDto) {
         if (req.user.isService && !req.user.permissions.includes('deposit')) {
             throw new ForbiddenException('Key missing deposit permission');
         }
@@ -54,8 +54,8 @@ export class WalletController {
     @ApiBearerAuth('JWT-auth')
     @ApiSecurity('API-Key-auth')
     @ApiOperation({ summary: 'Transfer funds to another wallet' })
-    @ApiBody({ schema: { type: 'object', properties: { wallet_number: { type: 'string' }, email: { type: 'string' }, amount: { type: 'number' } } } })
-    async transfer(@Req() req, @Body() body: { wallet_number?: string; email?: string; amount: number }) {
+    @UsePipes(new ValidationPipe({ transform: true }))
+    async transfer(@Req() req, @Body() body: TransferDto) {
         let recipientWalletId = body.wallet_number;
 
         if (body.email) {
