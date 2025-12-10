@@ -15,7 +15,12 @@ async function bootstrap() {
       'JWT-auth'
     )
     .addApiKey(
-      { type: 'apiKey', name: 'x-api-key', in: 'header' },
+      {
+        type: 'apiKey',
+        name: 'x-api-key',
+        in: 'header',
+        description: 'Enter your API Key here (sk_live_...)'
+      },
       'API-Key-auth'
     )
     .build();

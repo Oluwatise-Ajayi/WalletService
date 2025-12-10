@@ -12,13 +12,10 @@ import { PrismaService } from '../prisma.service';
 @Module({
     imports: [
         PassportModule,
-        JwtModule.registerAsync({
-            imports: [ConfigModule],
-            useFactory: async (configService: ConfigService) => ({
-                secret: configService.get<string>('jwt.secret'),
-                signOptions: { expiresIn: '1d' },
-            }),
-            inject: [ConfigService],
+        JwtModule.register({
+            global: true,
+            secret: process.env.JWT_SECRET || 'default_secret_do_not_use',
+            signOptions: { expiresIn: '1d' },
         }),
     ],
     controllers: [AuthController],
