@@ -1,5 +1,5 @@
 
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -124,9 +124,7 @@ export class KeysService {
             if (isMatch) {
                 // 4. Validate Expiry
                 if (record.expiresAt < new Date()) {
-                    // Could update DB to mark as revoked/expired if lazily checking?
-                    // For now just return null/throw
-                    return null; // Expired
+                    throw new UnauthorizedException('API Key has expired');
                 }
 
                 // 5. Return User + Permissions
